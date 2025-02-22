@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <title>Lista użytkowników</title>
+    <script src="https://unpkg.com/htmx.org@1.9.2"></script>
 </head>
 <body>
     <h1>Lista użytkowników</h1>
-    <ul>
+
+    <ul id="user-list">
         {{range .}}
         <li id="user-{{.ID}}">
             <span id="name-{{.ID}}">{{.Name}}</span>
-            
             <button hx-get="/edit?id={{.ID}}" hx-target="#user-{{.ID}}" hx-swap="outerHTML">Edytuj</button>
             <button hx-delete="/delete?id={{.ID}}" hx-target="#user-{{.ID}}" hx-swap="delete">Usuń</button>
         </li>
@@ -18,7 +19,7 @@
     </ul>
 
     <h2>Dodaj użytkownika</h2>
-    <form action="/add" method="POST">
+    <form hx-post="/add" hx-target="#user-list" hx-swap="beforeend">
         <input type="text" name="name" placeholder="Imię" required>
         <button type="submit">Dodaj</button>
     </form>

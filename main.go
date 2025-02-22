@@ -13,7 +13,7 @@ import (
 var db *sql.DB
 
 func main() {
-	fmt.Println("Serwer startuje...")
+	fmt.Println("Serwer startuje na http://localhost:8000")
 
 	// Połączenie z bazą danych
 	var err error
@@ -21,21 +21,21 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	createTable()
-
 	defer db.Close()
 
-	// Obsługa strony głównej
+	// Obsługa stron
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/add", addHandler)
+	http.HandleFunc("/delete", deleteHandler)
 	http.HandleFunc("/edit", editHandler)
 	http.HandleFunc("/update", updateHandler)
 
 	// Uruchomienie serwera
-	http.ListenAndServe(":8000", nil)
+	log.Fatal(http.ListenAndServe(":8000", nil))
 }
 
+// Tworzenie tabeli w SQLite
 func createTable() {
 	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,10 +46,10 @@ func createTable() {
 	}
 }
 
+// Strona główna - lista użytkowników
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl := template.Must(template.ParseFiles("templates/index.html"))
 
-	// Pobieramy użytkowników z bazy
 	rows, err := db.Query("SELECT id, name FROM users")
 	if err != nil {
 		log.Fatal(err)
@@ -61,7 +61,6 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 		Name string
 	}
 
-	// Wczytujemy użytkowników do tablicy
 	for rows.Next() {
 		var user struct {
 			ID   int
@@ -71,21 +70,36 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 		users = append(users, user)
 	}
 
-	// Renderujemy HTML i przekazujemy użytkowników
 	tmpl.Execute(w, users)
 }
 
+// Dodawanie użytkownika
 func addHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
-		name := r.FormValue("name") // Pobieramy wartość z formularza
+		name := r.FormValue("name")
 		_, err := db.Exec("INSERT INTO users (name) VALUES (?)", name)
 		if err != nil {
 			log.Fatal(err)
 		}
-		http.Redirect(w, r, "/", http.StatusSeeOther) // Przekierowanie na stronę główną
+		fmt.Fprintf(w, `<li id="user-%s">%s
+			<button hx-get="/edit?id=%s" hx-target="#user-%s" hx-swap="outerHTML">Edytuj</button>
+			<button hx-delete="/delete?id=%s" hx-target="#user-%s" hx-swap="delete">Usuń</button>
+		</li>`, name, name, name, name, name, name)
 	}
 }
 
+// Usuwanie użytkownika
+func deleteHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "DELETE" {
+		id := r.URL.Query().Get("id")
+		_, err := db.Exec("DELETE FROM users WHERE id = ?", id)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+// Pobieranie formularza edycji
 func editHandler(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("id")
 
@@ -95,7 +109,7 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 	}
 
-	// Zwracamy formularz edycji użytkownika
+	w.Header().Set("Content-Type", "text/html")
 	fmt.Fprintf(w, `
         <li id="user-%s">
             <form hx-put="/update" hx-target="#user-%s" hx-swap="outerHTML">
@@ -107,6 +121,7 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
     `, id, id, id, name)
 }
 
+// Aktualizacja użytkownika
 func updateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "PUT" {
 		id := r.FormValue("id")
@@ -117,7 +132,6 @@ func updateHandler(w http.ResponseWriter, r *http.Request) {
 			log.Fatal(err)
 		}
 
-		// Zwracamy zaktualizowaną wersję użytkownika
 		fmt.Fprintf(w, `
             <li id="user-%s">
                 <span id="name-%s">%s</span>
