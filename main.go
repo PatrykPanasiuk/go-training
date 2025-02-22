@@ -29,6 +29,8 @@ func main() {
 	// Obsługa strony głównej
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/add", addHandler)
+	http.HandleFunc("/edit", editHandler)
+	http.HandleFunc("/update", updateHandler)
 
 	// Uruchomienie serwera
 	http.ListenAndServe(":8000", nil)
@@ -103,4 +105,25 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
             </form>
         </li>
     `, id, id, id, name)
+}
+
+func updateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "PUT" {
+		id := r.FormValue("id")
+		name := r.FormValue("name")
+
+		_, err := db.Exec("UPDATE users SET name = ? WHERE id = ?", name, id)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Zwracamy zaktualizowaną wersję użytkownika
+		fmt.Fprintf(w, `
+            <li id="user-%s">
+                <span id="name-%s">%s</span>
+                <button hx-get="/edit?id=%s" hx-target="#user-%s" hx-swap="outerHTML">Edytuj</button>
+                <button hx-delete="/delete?id=%s" hx-target="#user-%s" hx-swap="delete">Usuń</button>
+            </li>
+        `, id, id, name, id, id, id, id)
+	}
 }
