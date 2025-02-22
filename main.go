@@ -83,3 +83,24 @@ func addHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther) // Przekierowanie na stronę główną
 	}
 }
+
+func editHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+
+	var name string
+	err := db.QueryRow("SELECT name FROM users WHERE id = ?", id).Scan(&name)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Zwracamy formularz edycji użytkownika
+	fmt.Fprintf(w, `
+        <li id="user-%s">
+            <form hx-put="/update" hx-target="#user-%s" hx-swap="outerHTML">
+                <input type="hidden" name="id" value="%s">
+                <input type="text" name="name" value="%s">
+                <button type="submit">Zapisz</button>
+            </form>
+        </li>
+    `, id, id, id, name)
+}

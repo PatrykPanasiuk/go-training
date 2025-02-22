@@ -8,7 +8,12 @@
     <h1>Lista użytkowników</h1>
     <ul>
         {{range .}}
-        <li>{{.Name}}</li>
+        <li id="user-{{.ID}}">
+            <span id="name-{{.ID}}">{{.Name}}</span>
+            
+            <button hx-get="/edit?id={{.ID}}" hx-target="#user-{{.ID}}" hx-swap="outerHTML">Edytuj</button>
+            <button hx-delete="/delete?id={{.ID}}" hx-target="#user-{{.ID}}" hx-swap="delete">Usuń</button>
+        </li>
         {{end}}
     </ul>
 
