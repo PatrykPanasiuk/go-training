@@ -106,11 +106,14 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		email := r.FormValue("email")
 		password := r.FormValue("password")
 
+		log.Println("Próba logowania dla e-maila:", email)
+
 		// Pobranie użytkownika z bazy
 		var id int
 		var hashedPassword string
 		err := db.QueryRow("SELECT id, password FROM users WHERE email = ?", email).Scan(&id, &hashedPassword)
 		if err != nil {
+			log.Println("Błąd: Użytkownik nie znaleziony:", email)
 			fmt.Fprintln(w, "Nieprawidłowy e-mail lub hasło")
 			return
 		}
@@ -118,6 +121,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		// Sprawdzenie hasła
 		err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 		if err != nil {
+			log.Println("Błąd: Niepoprawne hasło dla e-maila:", email)
 			fmt.Fprintln(w, "Nieprawidłowy e-mail lub hasło")
 			return
 		}
@@ -125,8 +129,19 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		// Tworzenie sesji
 		session, _ := store.Get(r, "session")
 		session.Values["userID"] = id
-		session.Save(r, w)
+		session.Options = &sessions.Options{
+			Path:     "/",
+			MaxAge:   3600, // Sesja ważna 1 godzinę
+			HttpOnly: true, // Nie pozwala na dostęp JavaScript
+		}
+		err = session.Save(r, w)
+		if err != nil {
+			log.Println("Błąd zapisywania sesji:", err)
+			fmt.Fprintln(w, "Błąd serwera")
+			return
+		}
 
+		log.Println("Zalogowano! userID:", id)
 		fmt.Fprintln(w, "Zalogowano pomyślnie!")
 	}
 }
