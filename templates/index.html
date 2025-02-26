@@ -6,6 +6,8 @@
     <script src="https://unpkg.com/htmx.org@1.9.2"></script>
 </head>
 <body>
+    <div id="user-menu" hx-get="/user-status" hx-trigger="load" hx-swap="outerHTML"></div>
+
     <h1>Rejestracja użytkownika</h1>
 
     <form hx-post="/register" hx-target="#message" hx-swap="innerHTML">
@@ -16,17 +18,12 @@
     <p id="message"></p>
 
     <h2>Logowanie</h2>
+
     <form hx-post="/login" hx-target="#login-message" hx-swap="innerHTML">
         <input type="email" name="email" placeholder="E-mail" required>
         <input type="password" name="password" placeholder="Hasło" required>
         <button type="submit">Zaloguj się</button>
     </form>
     <p id="login-message"></p>
-
-    <div id="user-menu">
-        <button hx-get="/account" hx-target="body" hx-swap="outerHTML">Moje konto</button>
-        <button hx-get="/logout" hx-target="body" hx-swap="outerHTML">Wyloguj</button>
-    </div>
-
 </body>
 </html>

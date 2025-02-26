@@ -34,6 +34,7 @@ func main() {
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/account", accountHandler)
 	http.HandleFunc("/logout", logoutHandler)
+	http.HandleFunc("/user-status", userStatusHandler)
 
 	// Uruchomienie serwera
 	log.Fatal(http.ListenAndServe(":8000", nil))
@@ -142,7 +143,13 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		log.Println("Zalogowano! userID:", id)
-		fmt.Fprintln(w, "Zalogowano pomyślnie!")
+
+		// Wymuszenie przekierowania na konto użytkownika
+		fmt.Fprintln(w, `
+			<script>
+				window.location.href = "/account";
+			</script>
+		`)
 	}
 }
 
@@ -152,7 +159,8 @@ func accountHandler(w http.ResponseWriter, r *http.Request) {
 	// Sprawdzenie, czy użytkownik jest zalogowany
 	userID, ok := session.Values["userID"]
 	if !ok {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		// Jeśli użytkownik nie jest zalogowany, zwracamy pustą odpowiedź (HTMX usunie sekcję)
+		fmt.Fprintln(w, "")
 		return
 	}
 
@@ -164,8 +172,15 @@ func accountHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Wyświetlenie strony konta
-	fmt.Fprintf(w, "<h1>Moje konto</h1><p>E-mail: %s</p><a href='/logout'>Wyloguj</a>", email)
+	// Wyświetlenie strony konta + menu użytkownika
+	fmt.Fprintf(w, `
+        <h1>Moje konto</h1>
+        <p>E-mail: %s</p>
+        <div id="user-menu">
+            <button hx-get="/account" hx-target="body" hx-swap="outerHTML">Moje konto</button>
+            <button hx-get="/logout" hx-target="body" hx-swap="outerHTML">Wyloguj</button>
+        </div>
+    `, email)
 }
 
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -174,4 +189,23 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 	session.Save(r, w)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func userStatusHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "session")
+	userID, ok := session.Values["userID"]
+
+	// Jeśli użytkownik nie jest zalogowany, zwracamy pustą odpowiedź (HTMX usunie sekcję)
+	if !ok || userID == nil {
+		fmt.Fprintln(w, "")
+		return
+	}
+
+	// Jeśli użytkownik jest zalogowany, zwracamy `user-menu`
+	fmt.Fprintln(w, `
+        <div id="user-menu">
+            <button hx-get="/account" hx-target="body" hx-swap="outerHTML">Moje konto</button>
+            <button hx-get="/logout" hx-target="body" hx-swap="outerHTML">Wyloguj</button>
+        </div>
+    `)
 }
