@@ -7,11 +7,14 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/gorilla/sessions"
+
 	"golang.org/x/crypto/bcrypt"
 	_ "modernc.org/sqlite"
 )
 
 var db *sql.DB
+var store = sessions.NewCookieStore([]byte("super-secret-key"))
 
 func main() {
 	fmt.Println("Serwer startuje na http://localhost:8000")
@@ -28,6 +31,9 @@ func main() {
 	// Obsługa stron
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/register", registerHandler)
+	http.HandleFunc("/login", loginHandler)
+	http.HandleFunc("/account", accountHandler)
+	http.HandleFunc("/logout", logoutHandler)
 
 	// Uruchomienie serwera
 	log.Fatal(http.ListenAndServe(":8000", nil))
@@ -47,13 +53,13 @@ func createTable() {
 	}
 }
 
-// Strona główna - formularz rejestracji
+// Main page - registration form
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl := template.Must(template.ParseFiles("templates/index.html"))
 	tmpl.Execute(w, nil)
 }
 
-// Funkcja do hashowania hasła
+// Password hashing
 func hashPassword(password string) (string, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -62,7 +68,7 @@ func hashPassword(password string) (string, error) {
 	return string(hashedPassword), nil
 }
 
-// Rejestracja użytkownika
+// User registration
 func registerHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		email := r.FormValue("email")
@@ -93,4 +99,64 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 		fmt.Fprintln(w, "Rejestracja zakończona sukcesem!")
 	}
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		email := r.FormValue("email")
+		password := r.FormValue("password")
+
+		// Pobranie użytkownika z bazy
+		var id int
+		var hashedPassword string
+		err := db.QueryRow("SELECT id, password FROM users WHERE email = ?", email).Scan(&id, &hashedPassword)
+		if err != nil {
+			fmt.Fprintln(w, "Nieprawidłowy e-mail lub hasło")
+			return
+		}
+
+		// Sprawdzenie hasła
+		err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+		if err != nil {
+			fmt.Fprintln(w, "Nieprawidłowy e-mail lub hasło")
+			return
+		}
+
+		// Tworzenie sesji
+		session, _ := store.Get(r, "session")
+		session.Values["userID"] = id
+		session.Save(r, w)
+
+		fmt.Fprintln(w, "Zalogowano pomyślnie!")
+	}
+}
+
+func accountHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "session")
+
+	// Sprawdzenie, czy użytkownik jest zalogowany
+	userID, ok := session.Values["userID"]
+	if !ok {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	// Pobranie e-maila użytkownika z bazy
+	var email string
+	err := db.QueryRow("SELECT email FROM users WHERE id = ?", userID).Scan(&email)
+	if err != nil {
+		http.Error(w, "Błąd serwera", http.StatusInternalServerError)
+		return
+	}
+
+	// Wyświetlenie strony konta
+	fmt.Fprintf(w, "<h1>Moje konto</h1><p>E-mail: %s</p><a href='/logout'>Wyloguj</a>", email)
+}
+
+func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "session")
+	session.Values["userID"] = nil
+	session.Save(r, w)
+
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
